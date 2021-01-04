@@ -256,7 +256,14 @@
             if (targetScope == FSCalendarScopeWeek) {
                 [dates addObject:self.calendar.currentPage];
             } else {
-                [dates addObject:[self.calendar.gregorian dateByAddingUnit:NSCalendarUnitDay value:3 toDate:self.calendar.currentPage options:0]];
+                [dates addObject:[self.calendar.gregorian dateByAddingUnit:NSCalendarUnitDay value:0 toDate:self.calendar.currentPage options:0]];
+                /*
+                 源码
+                 [dates addObject:[self.calendar.gregorian dateByAddingUnit:NSCalendarUnitDay value:3 toDate:self.calendar.currentPage options:0]];
+                 由于修改了targetPage的获取规则，在today为2020.12.xx月历状态，
+                 侧滑切换到2020.11，切换为周历，再切换为月历模式时，会获取不到focusDate，导致crash。
+                 故直接使用currentPage。
+                 */
             }
             dates.copy;
         });
@@ -274,7 +281,45 @@
         coordinate.row;
     });
     attributes.targetPage = ({
-        NSDate *targetPage = targetScope == FSCalendarScopeMonth ? [self.calendar.gregorian fs_firstDayOfMonth:attributes.focusedDate] : [self.calendar.gregorian fs_middleDayOfWeek:attributes.focusedDate];
+        __block NSDate *targetPage = nil;
+        if (targetScope == FSCalendarScopeMonth) {
+            targetPage = [self.calendar.gregorian fs_firstDayOfMonth:attributes.focusedDate];
+        }else{
+            NSDate *middleDate = [self.calendar.gregorian fs_middleDayOfWeek:attributes.focusedDate];
+            NSDate *firstDate = [self.calendar.gregorian fs_firstDayOfWeek:attributes.focusedDate];
+            NSDate *lastDate = [self.calendar.gregorian fs_lastDayOfWeek:attributes.focusedDate];
+            NSInteger focusedMonth = [self.calendar.gregorian component:NSCalendarUnitMonth fromDate:attributes.focusedDate];
+            [@[middleDate,firstDate,lastDate] enumerateObjectsUsingBlock:^(NSDate *  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+                NSInteger currentMonth = [self.calendar.gregorian component:NSCalendarUnitMonth fromDate:obj];
+                if (currentMonth == focusedMonth) {
+                    targetPage = obj;
+                    *stop = YES;
+                }
+            }];
+        }
+        
+        /*
+         条件：
+         firstWeekday = 2
+         adjustsBoundingRectWhenChangingMonths = true
+         
+         问题1：
+         2020年11月1号，周历和月历模式切换会出问题
+         原因：
+         从6行月历切换到周历时，targetPage会变为10月28号，此时从周历切换为月历，会通过targetPage去算本月月历行数，此时得到的结果是5行（10月的行数）
+         处理方法：
+         将源码fs_middleDayOfWeek改为fs_lastDayOfWeek
+         
+         问题2：
+         2020年11月30号，周历和月历模式切换会出问题
+         原因：
+         从6行月历切换到周历时，targetPage会变为12月3号，此时从周历切换为月历，会通过targetPage去算本月月历行数，此时得到的结果是5行（12月的行数）
+         处理方法：
+         将源码fs_middleDayOfWeek改为fs_firstDayOfWeek
+         
+         终极方案：
+         边界日期需要更细致的判断以保证targetPage在当前月
+         */
         targetPage;
     });
     attributes.targetBounds = [self boundingRectForScope:attributes.targetScope page:attributes.targetPage];

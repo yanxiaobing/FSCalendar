@@ -1,7 +1,7 @@
 Pod::Spec.new do |s|
 
   s.name             = "FSCalendar-Xbingo"
-  s.version          = "1.0.0"
+  s.version          = "1.0.1"
   s.summary          = "修复targetPage导致UI错乱问题"
   
   s.homepage         = "https://github.com/yanxiaobing"

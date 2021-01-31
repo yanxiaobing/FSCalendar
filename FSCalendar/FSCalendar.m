@@ -145,7 +145,7 @@ typedef NS_ENUM(NSUInteger, FSCalendarOrientation) {
 }
 
 - (void)initialize
-{   
+{
     _appearance = [[FSCalendarAppearance alloc] init];
     _appearance.calendar = self;
     
@@ -614,6 +614,22 @@ typedef NS_ENUM(NSUInteger, FSCalendarOrientation) {
         case FSCalendarScopeWeek: {
             NSDate *minimumPage = [self.gregorian fs_firstDayOfWeek:_minimumDate];
             targetPage = [self.gregorian dateByAddingUnit:NSCalendarUnitWeekOfYear value:sections toDate:minimumPage options:0];
+            /*
+             条件：
+             firstWeekday = 2
+             adjustsBoundingRectWhenChangingMonths = true
+             _minimumDate = 2021.01.01
+             周历切换至最前一周
+             
+             问题：
+             切换月历模式crash，此时源码计算的targetPage为2020.12.28超出_minimumDate；
+             
+             方案：
+             当targetPage < _minimumDate时，强制将_minimumDate赋值给targetPage
+             */
+            if (targetPage.timeIntervalSince1970 < _minimumDate.timeIntervalSince1970) {
+                targetPage = _minimumDate;
+            }
             break;
         }
     }
@@ -1457,7 +1473,7 @@ typedef NS_ENUM(NSUInteger, FSCalendarOrientation) {
     }
     if (cell) {
         cell.selected = YES;
-        if (self.collectionView.allowsMultipleSelection) {   
+        if (self.collectionView.allowsMultipleSelection) {
             [self.collectionView selectItemAtIndexPath:[self.collectionView indexPathForCell:cell] animated:NO scrollPosition:UICollectionViewScrollPositionNone];
         }
     }
